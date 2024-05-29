@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if [ -f 'artisan' ]; then
+    php artisan $@
+else
+    echo "artisan file not found in path!"
+    exit 1
+fi
