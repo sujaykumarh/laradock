@@ -60,6 +60,9 @@ COPY --chmod=755 ./.docker/docker-entrypoint.sh /usr/bin/entrypoint.sh
 RUN echo "Install Required php extensions..."; \
     curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/${PHP_EXT_INSTALLER_VER}/download/install-php-extensions  -o - | sh -s \
         pdo_mysql pdo_pgsql \
+        exif \
+        imagick \
+        json \
         zip \
         yaml \
         gd \
@@ -70,11 +73,24 @@ RUN echo "Install Required php extensions..."; \
         tidy \
         redis;\
     \
+    echo "Installing Php Intl"; \
+        apk add --update icu;\
+        apk add --no-cache --virtual .build-deps make zlib-dev icu-dev g++;\
+        docker-php-ext-configure intl && \
+            docker-php-ext-install intl && \
+            docker-php-ext-enable intl && \
+            { find /usr/local/lib -type f -print0 | xargs -0r strip --strip-all -p 2>/dev/null || true; }; \
+        apk del .build-deps; \
+    \
     echo "Remove unnecessary files..."; \
         apt autoremove -y; \
+        rm -rf /usr/local/lib/php/doc/*; \
         rm -rf /var/lib/apt/lists/*; \
+        rm -rf /var/cache/apk/*; \
         rm -rf /var/log/*; \
-        rm -rf /tmp/*;
+        rm -rf /tmp/*; \
+    \
+    echo "cleaned up after install";
 
 
 ########
