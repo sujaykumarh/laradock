@@ -22,7 +22,7 @@ ENV COMPOSER_HOME="${LARAVEL_USERHOME}/.composer"  \
 
 COPY --chmod=0755 --from=composer/composer:latest-bin /composer /usr/bin/composer
 
-COPY --chmod=0755 --from=oven/bun:alpine /usr/local/bin/bun /usr/bin/bun
+# COPY --chmod=0755 --from=oven/bun:alpine /usr/local/bin/bun /usr/bin/bun
 
 COPY --chmod=755 ./.docker/scripts/* /usr/local/sbin/
 
@@ -32,67 +32,6 @@ COPY --chmod=755 ./.docker/files/bashrc.sh /bashrc.sh
 ### Custom EntryPoint
 COPY --chmod=755 ./.docker/docker-entrypoint.sh /usr/bin/entrypoint.sh
 
-
-########
-#### Install Packages
-########
-
-# ## Install docker-php-extension-installer From Github  https://github.com/mlocati/docker-php-extension-installer
-# ADD --chmod=0755 https://github.com/mlocati/docker-php-extension-installer/releases/${PHP_EXT_INSTALLER_VER}/download/install-php-extensions \
-#     /usr/local/bin/phpExtensionInstaller
-
-######## LARAVEL
-
-# Laravel Required extensions   https://laravel.com/docs/11.x/deployment#server-requirements
-# ctype, curl, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, session, tokenizer, xml
-
-# check available extensions    docker run --rm php:8.3-cli php -m
-
-# installed with php    ::  curl, ctype, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, session, tokenizer, xml
-# Extra         ::  pdo_mysql, pdo_pgsql, zip, yaml, gd, csv, mcrypt, opcache, tidy, redis
-
-## Update && Install packages && CleanUp && Fix permissions
-# RUN echo "Add Packages..."; \
-#         apt update && \
-#         apt install -y --no-install-recommends \
-#         nano \
-#         zip; \
-#     \
-
-RUN echo "Install Required php extensions..."; \
-    curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/${PHP_EXT_INSTALLER_VER}/download/install-php-extensions  -o - | sh -s \
-        pdo_mysql pdo_pgsql \
-        exif \
-        imagick \
-        json \
-        zip \
-        yaml \
-        gd \
-        csv \
-        intl \
-        mcrypt \
-        opcache \
-        tidy \
-        redis;\
-    \
-    echo "Installing Php Intl"; \
-        apk add --update icu;\
-        apk add --no-cache --virtual .build-deps make zlib-dev icu-dev g++;\
-        docker-php-ext-configure intl && \
-            docker-php-ext-install intl && \
-            docker-php-ext-enable intl && \
-            { find /usr/local/lib -type f -print0 | xargs -0r strip --strip-all -p 2>/dev/null || true; }; \
-        apk del .build-deps; \
-    \
-    echo "Remove unnecessary files..."; \
-        apt autoremove -y; \
-        rm -rf /usr/local/lib/php/doc/*; \
-        rm -rf /var/lib/apt/lists/*; \
-        rm -rf /var/cache/apk/*; \
-        rm -rf /var/log/*; \
-        rm -rf /tmp/*; \
-    \
-    echo "cleaned up after install";
 
 
 ########
@@ -156,7 +95,69 @@ RUN echo "Setting up user dirs.."; \
         chown -R ${LARAVEL_UID}:${LARAVEL_GID} ${LARAVEL_APPDIR}; \
         chown -R ${LARAVEL_UID}:${LARAVEL_GID} ${LARAVEL_USERHOME};
 
-        
+########
+#### Install Packages
+########
+
+## required packages 
+RUN echo "Install required Packages..."; \
+        apt update && \
+        apt install -y --no-install-recommends \
+            nano \
+            unzip \
+            zip;
+
+# Install BUN to user
+USER $LARAVEL_USER
+RUN echo "Installing bun..."; \ 
+        curl -fsSL https://bun.sh/install | bash;
+USER root
+
+## For LARAVEL
+
+# Laravel Required extensions   https://laravel.com/docs/11.x/deployment#server-requirements
+# ctype, curl, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, session, tokenizer, xml
+
+# check available extensions    docker run --rm php:8.3-cli php -m
+
+# installed with php    ::  curl, ctype, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, session, tokenizer, xml
+# Extra         ::  pdo_mysql, pdo_pgsql, zip, yaml, gd, csv, mcrypt, opcache, tidy, redis
+
+# Install & cleanup
+RUN echo "Install Required php extensions..."; \
+    curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/${PHP_EXT_INSTALLER_VER}/download/install-php-extensions  -o - | sh -s \
+        pdo_mysql pdo_pgsql \
+        exif \
+        imagick \
+        json \
+        zip \
+        yaml \
+        gd \
+        csv \
+        intl \
+        mcrypt \
+        opcache \
+        tidy \
+        redis;\
+        docker-php-ext-configure intl && \
+    \
+    echo "Install PHP intl..."; \
+        docker-php-ext-install intl && \
+        docker-php-ext-enable intl && \
+        { find /usr/local/lib -type f -print0 | xargs -0r strip --strip-all -p 2>/dev/null || true; }; \
+    \
+    echo "Remove unnecessary files..."; \
+        apt clean autoclean; \
+        apt autoremove --yes; \
+        rm -rf /usr/local/lib/php/doc/*; \
+        rm -rf /var/lib/apt/lists/*; \
+        rm -rf /var/lib/{apt,dpkg,cache,log}/; \
+        rm -rf /var/log/*; \
+        rm -rf /tmp/*; \
+    \
+    echo "cleaned up after install";
+
+
 ## Set Default USER
 USER $LARAVEL_USER
 
