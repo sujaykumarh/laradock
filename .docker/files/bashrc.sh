@@ -50,7 +50,7 @@ export PATH=$PATH:/bin
 # setup custom paths
 export PATH=$PATH:$LARAVEL_APPDIR/vendor/bin
 export PATH=$PATH:$HOME/.composer/vendor/bin
-
+export PATH=$PATH:$HOME/.bun/bin
 
 
 # Info
