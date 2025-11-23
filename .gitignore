@@ -101,3 +101,5 @@ tmp
 ## Custom config
 #############
 /_
+
+/*.log
