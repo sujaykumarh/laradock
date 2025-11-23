@@ -53,20 +53,12 @@ export PATH=$PATH:$HOME/.composer/vendor/bin
 export PATH=$PATH:$HOME/.bun/bin
 
 
-# Info
-# printf "$cBLUE"
-# figlet -w 120 "LaraDock"
-# echo "Laravel on Docker"
-# printf "$cNC"
+# Show Info
+printf "$cBLUE"
+figlet -w 120 "LaraDock"
+printf "$cNC"
 
-# # OS Info
-# . /etc/os-release
-# echo "$PRETTY_NAME `uname -m`"
-
-# # Additional System Info
-# echo "kernel:`uname -r` hostname:`uname -n` user:`whoami` "
-# echo "PHP: v`php -r 'echo PHP_VERSION;'` "
-
+build-info
 
 ### Aliases
 
@@ -95,7 +87,6 @@ fi
 SHELL_CHAR="$SHELL_COLOR$SHELL_CHAR$cNC"
 SHELL="$NEWLINE$SHELL_COLOR\u@$cNC$cBLUE\h$cNC [\w] $SHELL_CHAR "
 export PS1="$SHELL"
-
 
 # Custom user profile
 USER_SHELL="~/.profile"

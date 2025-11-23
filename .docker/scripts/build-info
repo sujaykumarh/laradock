@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# OS Info
+. /etc/os-release
+echo "OS                : $PRETTY_NAME `uname -m`"
+echo "kernel            : `uname -r`"
+echo "hostname          : `uname -n`"
+echo "user              : `whoami` (`id -u`:`id -g`)"
+
+# Laravel Info
+echo "PHP version       : `php -r "echo PHP_VERSION;"`"
+echo "Laravel version   : $LARAVEL_VER"
+echo "Laradock version  : $LARADOCK_VER"
+
+# empty line
+echo ""

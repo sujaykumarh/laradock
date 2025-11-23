@@ -1,4 +1,4 @@
-FROM php:8.3-fpm
+FROM php:8.4-fpm
 
 #trigger build
 
@@ -6,24 +6,28 @@ FROM php:8.3-fpm
 #### Setup ENV Vars
 ########
 
-ARG LARAVEL_UID="1000" \
+ARG LARADOCK_VER="latest" \
+    LARADOCK_PLAT="amd64" \
+    LARAVEL_VER="v12" \
+    PHP_EXT_INSTALLER_VER="latest" \
+    \
+    LARAVEL_UID="1000" \
     LARAVEL_GID="1000" \
     LARAVEL_USER="laravel" \
     LARAVEL_GROUP="laravel" \
     LARAVEL_USERHOME="/home/laravel" \
     LARAVEL_WORKDIR="/app" \
     LARAVEL_APPDIR="/app" \
-    LARAVEL_DATADIR="/app/.data" \
-    PHP_EXT_INSTALLER_VER="latest"
+    LARAVEL_DATADIR="/app/.data"
 
 # https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
 ENV COMPOSER_HOME="${LARAVEL_USERHOME}/.composer"  \
-    COMPOSER_ALLOW_SUPERUSER="0"
+    COMPOSER_ALLOW_SUPERUSER="0" \
+    LARADOCK_VER="${LARADOCK_VER}" \
+    LARADOCK_PLAT="${LARADOCK_PLAT}" \
+    LARAVEL_VER="${LARAVEL_VER}"
 
-COPY --chmod=0755 --from=composer/composer:latest-bin /composer /usr/bin/composer
-
-# COPY --chmod=0755 --from=oven/bun:alpine /usr/local/bin/bun /usr/bin/bun
-
+### Custom Scripts
 COPY --chmod=755 ./.docker/scripts/* /usr/local/sbin/
 
 ### Custom SHELL
@@ -31,8 +35,6 @@ COPY --chmod=755 ./.docker/files/bashrc.sh /bashrc.sh
 
 ### Custom EntryPoint
 COPY --chmod=755 ./.docker/docker-entrypoint.sh /usr/bin/entrypoint.sh
-
-
 
 ########
 #### ADD default $USER & App Dirs / Files
@@ -63,28 +65,39 @@ RUN echo "Setting up user dirs.."; \
     echo "Setting up basic laravel dirs.."; \
     mkdir -p \
         ${LARAVEL_APPDIR}/.data \
+        ${LARAVEL_APPDIR}/.turbo \
         ${LARAVEL_APPDIR}/app \
         ${LARAVEL_APPDIR}/bootstrap/cache \
         ${LARAVEL_APPDIR}/config \
         ${LARAVEL_APPDIR}/database \
         ${LARAVEL_APPDIR}/lang \
         ${LARAVEL_APPDIR}/Modules \
-        ${LARAVEL_APPDIR}/public \
+        ${LARAVEL_APPDIR}/public/media \
         ${LARAVEL_APPDIR}/resources \
         ${LARAVEL_APPDIR}/routes \
+        ${LARAVEL_APPDIR}/storage/app/public \
         ${LARAVEL_APPDIR}/storage/framework/cache \
         ${LARAVEL_APPDIR}/storage/framework/sessions \
         ${LARAVEL_APPDIR}/storage/framework/testing \
         ${LARAVEL_APPDIR}/storage/framework/views \
+        ${LARAVEL_APPDIR}/storage/logs \
         ${LARAVEL_APPDIR}/stubs \
+        ${LARAVEL_APPDIR}/tests \
         ${LARAVEL_APPDIR}/node_modules \
         ${LARAVEL_APPDIR}/vendor; \
     \
     echo "Making required empty files..."; \
         echo "{}" >> ${LARAVEL_APPDIR}/composer.json; \
         echo "{}" >> ${LARAVEL_APPDIR}/composer.lock; \
+        echo "{}" >> ${LARAVEL_APPDIR}/bun.lock; \
+        echo "{}" >> ${LARAVEL_APPDIR}/turbo.json; \
+        echo "{}" >> ${LARAVEL_APPDIR}/tsconfig.json; \
         echo "{}" >> ${LARAVEL_APPDIR}/package.json; \
+        echo "{}" >> ${LARAVEL_APPDIR}/package-lock.json; \
+        echo "{}" >> ${LARAVEL_APPDIR}/pnpm-lock.json; \
         echo "{}" >> ${LARAVEL_APPDIR}/modules_statuses.json; \
+        echo "" >> ${LARAVEL_APPDIR}/.gitignore; \
+        echo "" >> ${LARAVEL_APPDIR}/.npmrc; \
         echo "" >> ${LARAVEL_APPDIR}/tailwind.config.js; \
         echo "" >> ${LARAVEL_APPDIR}/vite.config.js; \
         echo "" >> ${LARAVEL_APPDIR}/.data/db.sqlite; \
@@ -96,52 +109,41 @@ RUN echo "Setting up user dirs.."; \
         chown -R ${LARAVEL_UID}:${LARAVEL_GID} ${LARAVEL_USERHOME};
 
 ########
-#### Install Packages
+#### Install Packages & CleanUp
 ########
 
-## required packages 
-RUN echo "Install required Packages..."; \
+RUN echo "Installing composer..."; \
+        cd $HOME; php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"; \
+        php composer-setup.php --quiet; rm composer-setup.php; \
+        mv composer.phar composer; \
+        mv composer /usr/bin/; \
+    echo "Installing packages..."; \
         apt update && \
         apt install -y --no-install-recommends \
+            figlet \
             nano \
             unzip \
-            zip;
-
-# Install BUN to user
-USER $LARAVEL_USER
-RUN echo "Installing bun..."; \ 
-        curl -fsSL https://bun.sh/install | bash;
-USER root
-
-## For LARAVEL
-
-# Laravel Required extensions   https://laravel.com/docs/11.x/deployment#server-requirements
-# ctype, curl, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, session, tokenizer, xml
-
-# check available extensions    docker run --rm php:8.3-cli php -m
-
-# installed with php    ::  curl, ctype, dom, fileinfo, filter, hash, mbstring, openssl, pcre, pdo, session, tokenizer, xml
-# Extra         ::  pdo_mysql, pdo_pgsql, zip, yaml, gd, csv, mcrypt, opcache, tidy, redis
-
-# Install & cleanup
-RUN echo "Install Required php extensions..."; \
-    curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/${PHP_EXT_INSTALLER_VER}/download/install-php-extensions  -o - | sh -s \
-        pdo_mysql pdo_pgsql \
-        exif \
-        imagick \
-        json \
-        zip \
-        yaml \
-        gd \
-        csv \
-        intl \
-        mcrypt \
-        opcache \
-        tidy \
-        redis;\
-        docker-php-ext-configure intl && \
+            zip; \
+    echo "Installing Bun to $LARAVEL_USER..."; \
+        su - $LARAVEL_USER -c 'curl -fsSL https://bun.sh/install | bash'; \
+    echo "Install Required php extensions..."; \
+        curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/${PHP_EXT_INSTALLER_VER}/download/install-php-extensions  -o - | sh -s \
+            pdo_mysql pdo_pgsql \
+            exif \
+            imagick \
+            json \
+            zip \
+            yaml \
+            gd \
+            csv \
+            intl \
+            mcrypt \
+            opcache \
+            tidy \
+            redis; \
     \
     echo "Install PHP intl..."; \
+        docker-php-ext-configure intl && \
         docker-php-ext-install intl && \
         docker-php-ext-enable intl && \
         { find /usr/local/lib -type f -print0 | xargs -0r strip --strip-all -p 2>/dev/null || true; }; \
@@ -156,7 +158,6 @@ RUN echo "Install Required php extensions..."; \
         rm -rf /tmp/*; \
     \
     echo "cleaned up after install";
-
 
 ## Set Default USER
 USER $LARAVEL_USER
