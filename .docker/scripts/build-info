@@ -12,5 +12,8 @@ echo "PHP version       : `php -r "echo PHP_VERSION;"`"
 echo "Laravel version   : $LARAVEL_VER"
 echo "Laradock version  : $LARADOCK_VER"
 
+# Bun Info
+echo "Bun version       : `bun --version | tr -d '\n'`"
+
 # empty line
 echo ""
