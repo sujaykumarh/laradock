@@ -3,92 +3,124 @@ name: "Build & Publish Docker Image"
 # trigger events
 on:
   # Manual
-  workflow_dispatch:
+  # workflow_dispatch:
 
-  # automatic
-  push:
-    branches:
-      - 'main'
-    paths:
-      - "Dockerfile"
-      - ".docker/**"
+  # Automatic
+  release:
+    types: [created]
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  CONTAINER_PLATFORM: linux/amd64
+  # CONTAINER_PLATFORM: linux/amd64, linux/arm64
 
 jobs:
 
   # Generate Docker image
   build-push:
-    name: build-docker-image
-    runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' }}
+
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       packages: write
       contents: read
       attestations: write
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
 
     steps:
 
       # Pull Source Code
-      -
-        name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      # Add support for more platforms with QEMU
-      # https://github.com/docker/setup-qemu-action
-      -
-        name: Set up QEMU
+      # Add support for more platforms with QEMU - https://github.com/docker/setup-qemu-action
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       # Set up Docker for Buildx env
-      -
-        name: Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # - run: echo BUILD_INFO="$(date +%s)" >> $GITHUB_ENV
-      # - run: echo BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
-
-      # ## Login
-      # - name: 🔐 Login to DockerHub
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.dockerHubUsername }}
-      #     password: ${{ secrets.dockerHubPassword }}
-
+      # Login
       - name: 🔐 Login to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      -
-        name: Build and push
+
+      # Determine docker image tags
+      - name: Determine image tags
+        id: tags
+        run: |
+          # Use release tag ref if present, else fallback to release.tag_name or release.name
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [ -z "$TAG" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG="${{ github.event.release.name }}"
+          fi
+
+          # strip leading v or V (so v1.2.3 -> 1.2.3)
+          TAG="${TAG#v}"
+          TAG="${TAG#V}"
+
+          # sanitize tag (keep . _ -)
+          TAG_SAFE="$(echo "$TAG" | sed -E 's/[^A-Za-z0-9._-]/_/g')"
+          echo "release_tag=$TAG_SAFE" >> $GITHUB_OUTPUT
+
+          # Add 'latest' for non-prerelease releases
+          if [ "${{ github.event.release.prerelease }}" = "false" ]; then
+            echo "add_latest=true" >> $GITHUB_OUTPUT
+          else
+            echo "add_latest=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Determine docker platform
+      - name: Determine platform
+        id: set-platform
+        run: |
+          PLAT="${{ env.CONTAINER_PLATFORM }}"
+          # determine LARA_PLATFORM: prefer amd64 then arm64, else first entry (strip 'linux/')
+          if echo "$PLAT" | grep -q 'linux/amd64'; then
+            LARA_PLAT=amd64
+          elif echo "$PLAT" | grep -q 'linux/arm64'; then
+            LARA_PLAT=arm64
+          else
+            LARA_PLAT="$(echo "$PLAT" | cut -d',' -f1 | sed -E 's@.*/@@')"
+          fi
+          echo "platform=$LARA_PLAT" >> $GITHUB_OUTPUT
+          echo "buildx_platforms=${PLAT}" >> $GITHUB_OUTPUT
+
+      - name: Build and push
         uses: docker/build-push-action@v5
         id: push
         with:
           context: .
-          # platforms: linux/amd64,linux/arm64
-          platforms: linux/amd64
+          platforms: ${{ steps.set-platform.outputs.buildx_platforms }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          # build-args: |
-          #   ARG LARAVEL_UID="1000"
-          #   LARAVEL_GID="1000"
-          #   LARAVEL_USER="laravel"
-          #   LARAVEL_GROUP="laravel"
-          #   LARAVEL_USERHOME="/home/laravel"
-          #   LARAVEL_WORKDIR="/app"
-          #   LARAVEL_APPDIR="/app"
-          #   LARAVEL_DATADIR="/app/.data"
-          #   PHP_EXT_INSTALLER_VER="latest"
-      
+            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.release_tag }}
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          build-args: |
+            LARADOCK_VER=${{ steps.tags.outputs.release_tag }}
+            LARADOCK_PLAT=${{ steps.set-platform.outputs.platform }}
+
+      # Attest Docker image & Push digest
       - name: Attest
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v3
         id: attest
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+      # Tag Docker image with :latest only if its release
+      - name: Push latest tag (if release)
+        if: steps.tags.outputs.add_latest == 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+          docker pull "${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.release_tag }}" || exit 1
+          docker tag "${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.release_tag }}" "${{ env.IMAGE_NAME }}:latest"
+          docker push "${{ env.IMAGE_NAME }}:latest"
