@@ -5,6 +5,6 @@ If you have found a security isssue on this project read the reporting guideline
 ## Reporting a Vulnerability
 
 * do not create a public issue
-* email to `security [at] sujaykumarh [dot] com` with title `laradock-security issue`
+* email to `security [at] sujayh [dot] dev` with title `laradock-security issue`
 * add relavant information in body
 * possible solutions if any
