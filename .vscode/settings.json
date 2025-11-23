@@ -1,0 +1,6 @@
+{
+  "files.associations": {
+    ".docker/scripts/**/*": "shellscript",
+    "**/*.sh": "shellscript",
+  }
+}
