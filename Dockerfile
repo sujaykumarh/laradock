@@ -89,7 +89,7 @@ RUN echo "Setting up user dirs.."; \
     echo "Making required empty files..."; \
         echo "{}" >> ${LARAVEL_APPDIR}/composer.json; \
         echo "{}" >> ${LARAVEL_APPDIR}/composer.lock; \
-        echo "{}" >> ${LARAVEL_APPDIR}/bun.lock; \
+        echo '{"lockfileVersion":1,"configVersion":1,"workspaces":{"":{"dependencies":{}}},"packages":{}}' >> ${LARAVEL_APPDIR}/bun.lock; \
         echo "{}" >> ${LARAVEL_APPDIR}/turbo.json; \
         echo "{}" >> ${LARAVEL_APPDIR}/tsconfig.json; \
         echo "{}" >> ${LARAVEL_APPDIR}/package.json; \
