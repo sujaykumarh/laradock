@@ -67,9 +67,10 @@ alias grep='grep --colour=auto'
 alias egrep='egrep --colour=auto'
 alias fgrep='fgrep --colour=auto'
 
-# custom alias for laravel
+# custom alias for laravel artisan & composer commands
 alias a='artisan'
 alias ac='artisan-clear'
+alias ao='artisan-optimize'
 alias dump='composer-dump'
 
 

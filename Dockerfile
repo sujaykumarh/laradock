@@ -8,7 +8,7 @@ FROM php:8.5-fpm
 
 ARG LARADOCK_VER="latest" \
     LARADOCK_PLAT="amd64" \
-    LARAVEL_VER="v12" \
+    LARAVEL_VER="v13" \
     PHP_EXT_INSTALLER_VER="latest" \
     \
     LARAVEL_UID="1000" \

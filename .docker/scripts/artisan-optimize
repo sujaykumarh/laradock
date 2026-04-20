@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ####
-## AiO (All in one) artisan clear
+## AiO (All in one) artisan optimize
 ##
 ## MIT license   : Copyright (c) 2024 sujaykumarh 
 ## Full license : https://github.com/sujaykumarh/laradock/blob/main/LICENSE
@@ -20,20 +20,13 @@ if [ -f 'artisan' ]; then
     }
 
     # Standard commands
-    php artisan clear-compiled
-    php artisan cache:clear
-    php artisan config:clear
-    php artisan view:clear
+    # php artisan optimize
     
     # Optional / Package-specific commands
-    run_if_exists "debugbar:clear"
-    run_if_exists "telescope:clear"
-    run_if_exists "horizon:terminate"
-    run_if_exists "filament:clear-cached-components"
-    run_if_exists "filament:optimize-clear"
+    run_if_exists "filament:optimize"
 
     # Final optimization
-    php artisan optimize:clear
+    php artisan optimize
 
 else
     echo "artisan file not found in path!"
